@@ -1,0 +1,27 @@
+# Large output files
+*.html
+*.pdf
+notebooks/htmls/
+notebooks/pdfs/
+
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints
+*.log
+
+# Environment
+.env
+.venv
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Cache
+cache/
+.cache/
+
+# Keep .keras files for now
+# *.keras
