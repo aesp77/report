@@ -35,7 +35,7 @@ def build_full_surface_feature_df(df_path: str, dropna: bool = True) -> pd.DataF
     if dropna:
         pivot_df = pivot_df.dropna()
     # flatten column names
-    flat_cols = [f"iv_{mat}_{strike:.2f}" for mat, strike in pivot_df.columns]
+    flat_cols = [f"IV_{mat}_{strike:.2f}" for mat, strike in pivot_df.columns]
     surface_df = pivot_df.copy()
     surface_df.columns = flat_cols
     # build feature block

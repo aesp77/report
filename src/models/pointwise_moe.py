@@ -8,16 +8,6 @@ import numpy as np
 
 @register_keras_serializable()
 class PiecewiseSurfaceDecoderModular(keras.Model):
-    """Modular piecewise decoder with Mixture-of-Experts (MoE) for volatility surface.
-    Hidden layers: Dense with configurable activation (elu, relu, gelu, tanh, sigmoid).
-    MoE options:
-        use_moe: enable mixture-of-experts
-        num_experts: number of experts
-        atm_specialization: ATM expert bias
-        maturity_specialization: maturity expert bias
-        lambda_diversity: diversity penalty weight
-    Output: Dense(1) with softplus activation.
-    """
     def __init__(self, latent_dim, M, K, taus,
                 feature_dim=0,
                 activation="elu",
@@ -32,9 +22,9 @@ class PiecewiseSurfaceDecoderModular(keras.Model):
                 atm_specialization=False,
                 atm_loss_weight=1.0,
                 atm_expert_bias=2.0,
-                maturity_experts=2,
-                free_experts=2,
-                maturity_specialization=True,
+                maturity_experts=2,          # Number of maturity-specific experts
+                free_experts=2,              # these have become 
+                maturity_specialization=True, # Enable maturity-based biasing
                 **kwargs):
         super().__init__(**kwargs)
         atm_count = 1 if atm_specialization else 0
@@ -46,7 +36,10 @@ class PiecewiseSurfaceDecoderModular(keras.Model):
         self.maturity_experts = maturity_count
         self.free_experts = actual_free_experts
         self.atm_experts = atm_count
-        # Model parameters
+        
+        print(f"Expert allocation: ATM={atm_count}, Maturity={maturity_count}, Free={actual_free_experts}, Total={num_experts}")
+        
+        # Store parameters
         self.latent_dim = latent_dim
         self.feature_dim = feature_dim
         self.M = M
@@ -65,7 +58,8 @@ class PiecewiseSurfaceDecoderModular(keras.Model):
         self.atm_loss_weight = atm_loss_weight
         self.atm_expert_bias = atm_expert_bias
         self.maturity_specialization = maturity_specialization
-        # Shared dense layers for feature processing
+
+        # Shared dense layers
         self.dense_layers = []
         for units in [256, 128, 64]:
             self.dense_layers.append(Dense(units))
@@ -74,34 +68,41 @@ class PiecewiseSurfaceDecoderModular(keras.Model):
             self.dense_layers.append(Activation(self._get_activation(self.activation)))
             if self.dropout_rate > 0:
                 self.dense_layers.append(Dropout(self.dropout_rate))
-        # Mixture-of-Experts output layer setup
+        
         if self.use_moe:
+            # MoE output layer
             if self.atm_specialization:
+                # ATM-biased gating network
                 self.gating_network = Sequential([
                     Dense(32, activation="relu", kernel_regularizer="l2"),
                     Dense(16, activation="relu", kernel_regularizer="l2"),
-                    Dense(num_experts)
+                    Dense(num_experts)  # No softmax - applied with ATM bias
                 ])
             else:
+                # Standard gating network
                 self.gating_network = Sequential([
                     Dense(32, activation="relu", kernel_regularizer="l2"),
                     Dense(16, activation="relu", kernel_regularizer="l2"),
                     Dense(num_experts, activation="softmax")
                 ])
+            
             self.experts = []
             for i in range(num_experts):
                 if self.atm_specialization and i == 0:
+                    # First expert specialized for ATM
                     expert = Sequential([
-                        Dense(24, activation="elu", kernel_regularizer="l2"),
+                        Dense(24, activation="elu", kernel_regularizer="l2"),  # Larger for ATM
                         Dense(1, activation="softplus")
                     ])
                 else:
+                    # Standard experts
                     expert = Sequential([
                         Dense(16, activation="elu", kernel_regularizer="l2"),
                         Dense(1, activation="softplus")
                     ])
                 self.experts.append(expert)
         else:
+            # Standard output layer
             self.output_layer = Dense(1, activation="softplus")
             
     def build_training_data_from_surfaces(self, Z_latent, Y_surface_flat, strike_tensor, tau_tensor, F_features=None):
@@ -137,48 +138,58 @@ class PiecewiseSurfaceDecoderModular(keras.Model):
         return ops.exp(-5.0 * ops.square(m - 1.0))
 
     def call(self, inputs, training=None):
-            """Forward pass for surface decoder.
-            If MoE enabled, combines expert outputs using gating network and specialization biases.
-            """
-            if self.feature_dim > 0 and len(inputs) == 4:
-                z, m, tau, f = inputs
-                z = ops.concatenate([z, f], axis=-1)
-            else:
-                z, m, tau = inputs
-            # Optionally expand moneyness and tau features
-            if self.m_expand:
-                m = ops.concatenate([m, ops.square(m)], axis=-1)
-            if self.tau_expand:
-                tau = ops.concatenate([tau, ops.square(tau), ops.log(ops.add(tau, 1e-3))], axis=-1)
-            x = ops.concatenate([z, m, tau], axis=-1)
-            # Shared feature processing
-            for layer in self.dense_layers:
-                x = layer(x, training=training)
-            if self.use_moe:
-                # MoE: gating network and expert outputs
-                m_orig = inputs[1] if len(inputs) > 1 else m
-                tau_orig = inputs[2] if len(inputs) > 2 else tau
-                self.current_moneyness = m_orig
-                self.current_tau = tau_orig
-                gate_logits = self.gating_network(x, training=training)
-                if self.atm_specialization or self.maturity_specialization:
-                    expert_biases = self._compute_expert_biases(m_orig, tau_orig)
-                    gate_logits = gate_logits + expert_biases
-                gate_weights = ops.softmax(gate_logits)
-                expert_outputs = []
-                for expert in self.experts:
-                    output = expert(x, training=training)
-                    expert_outputs.append(output)
-                # Store for diversity penalty
-                if training:
-                    self.last_expert_outputs = expert_outputs
-                # Weighted combination of expert outputs
-                expert_stack = ops.stack(expert_outputs, axis=-1)
-                gate_expanded = ops.expand_dims(gate_weights, axis=1)
-                weighted_output = ops.sum(expert_stack * gate_expanded, axis=-1)
-                return weighted_output
-            else:
-                return self.output_layer(x, training=training)
+        if self.feature_dim > 0 and len(inputs) == 4:
+            z, m, tau, f = inputs
+            z = ops.concatenate([z, f], axis=-1)
+        else:
+            z, m, tau = inputs
+
+        if self.m_expand:
+            m = ops.concatenate([m, ops.square(m)], axis=-1)
+        if self.tau_expand:
+            tau = ops.concatenate([tau, ops.square(tau), ops.log(ops.add(tau, 1e-3))], axis=-1)
+
+        x = ops.concatenate([z, m, tau], axis=-1)
+        
+        # Store original inputs for specialization
+        if self.use_moe:
+            m_orig = inputs[1] if len(inputs) > 1 else m
+            tau_orig = inputs[2] if len(inputs) > 2 else tau
+            self.current_moneyness = m_orig
+            self.current_tau = tau_orig
+        
+        # Shared feature processing
+        for layer in self.dense_layers:
+            x = layer(x, training=training)
+        
+        if self.use_moe:
+            # Get raw gate logits
+            gate_logits = self.gating_network(x, training=training)
+            
+            # Apply specialization biases
+            if self.atm_specialization or self.maturity_specialization:
+                expert_biases = self._compute_expert_biases(m_orig, tau_orig)
+                gate_logits = gate_logits + expert_biases
+            
+            gate_weights = ops.softmax(gate_logits)
+            
+            expert_outputs = []
+            for expert in self.experts:
+                output = expert(x, training=training)
+                expert_outputs.append(output)
+            
+            # Store for diversity penalty
+            if training:
+                self.last_expert_outputs = expert_outputs
+            
+            # Weighted combination
+            expert_stack = ops.stack(expert_outputs, axis=-1)
+            gate_expanded = ops.expand_dims(gate_weights, axis=1)
+            weighted_output = ops.sum(expert_stack * gate_expanded, axis=-1)
+            
+            return weighted_output
+        else:
+            return self.output_layer(x, training=training)
 
     def compute_moe_loss(self, inputs, y_true, training=True):
         """Custom loss computation with MoE diversity penalty and ATM weighting"""
@@ -362,7 +373,7 @@ class PiecewiseSurfaceDecoderModular(keras.Model):
         batch_size = ops.shape(m)[0]
         biases = ops.zeros((batch_size, self.num_experts))
         
-        # AUTOMATED APPROACH: Temperature annealing (Fedus et al., 2021)
+        #  Temperature annealing (Fedus et al., 2021)
         # Start with strong biases, gradually reduce to let model learn naturally
         if hasattr(self, '_training_step'):
             self._training_step += 1
@@ -384,7 +395,7 @@ class PiecewiseSurfaceDecoderModular(keras.Model):
                 # Simple heuristic: assume reasonable annealing duration
                 self._total_training_steps = 2000  # Most MoE papers use 1000-3000 steps
         
-        # Anneal over first 20% of training
+        # Anneal over first 35% of training
         annealing_fraction = getattr(self, 'annealing_fraction', 0.35)
         annealing_steps = int(self._total_training_steps * annealing_fraction)
         
@@ -399,28 +410,28 @@ class PiecewiseSurfaceDecoderModular(keras.Model):
         moderate_bias = moderate_bias_end + (moderate_bias_start - moderate_bias_end) * (1.0 - progress)
         
         if self.maturity_specialization:
-            # Aligned with actual maturity grid: [0.083, 0.167, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0]
+            # ref maturity_grid [0.083, 0.167, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0]
             tau_bands = [0.3, 0.75, 2, 3.5]  # Group ultra-short, separate medium problem zone, long-term
             bias_strengths = [
-            max_bias,              # Ultra-short: 8.0→2.0 (keep high)
-            moderate_bias,         # Short-medium: 4.0→1.0 (reduce from +1)  
-            moderate_bias + 2.0,   # Problem zone: 5.0→2.0 (increase focus)
-            moderate_bias+1.0,         # Long-term: 4.0→1.0 (reduce from 2.5)
-            moderate_bias +1.5    # Background: 3.0→0.0 (reduce from 1)
+            max_bias*1.5,              # Ultra-short:
+            moderate_bias+1.0,         # Short-medium
+            moderate_bias + 2.0,   # Problem zone:
+            moderate_bias + 1.5,   # Long-term: 
+            moderate_bias + 4    # Background: 
         ] # Stronger bias for 1.5-3.0 range
             
             for i in range(self.maturity_experts):
                 if i == 0:  # Ultra-short cluster: 0.083, 0.167, 0.25
-                    condition = tau < tau_bands[0]  # τ < 0.3
+                    condition = tau < tau_bands[0]  # tau < 0.3
                     bias_strength = bias_strengths[0]
-                elif i == 1:  # Short-medium: 0.5, 0.75 
-                    condition = (tau >= tau_bands[0]) & (tau < tau_bands[1])  # 0.3 ≤ τ < 0.75
+                elif i == 1:  # Short-medium: 0.5, 0.75
+                    condition = (tau >= tau_bands[0]) & (tau < tau_bands[1])  # 0.3 ≤ tau < 0.75
                     bias_strength = bias_strengths[1]
                 elif i == 2:  # Problem zone: 1.0, 1.5 (where gap widens)
-                    condition = (tau >= tau_bands[1]) & (tau < tau_bands[2])  # 0.75 ≤ τ < 1.5
+                    condition = (tau >= tau_bands[1]) & (tau < tau_bands[2])  # 0.75 ≤ tau < 1.5
                     bias_strength = bias_strengths[2]  # Stronger bias 2.5
                 else:  # Long-term: 2.0, 3.0, 4.0, 5.0 (where gap widens more)
-                    condition = tau >= tau_bands[2]  # τ ≥ 1.5
+                    condition = tau >= tau_bands[2]  # tau ≥ 1.5
                     bias_strength = bias_strengths[3]
                 
                 maturity_bias = ops.where(condition, bias_strength, 0.0)
@@ -439,7 +450,7 @@ class PiecewiseSurfaceDecoderModular(keras.Model):
                 
                 if i == 0:  # ITM expert
                     condition = m < strike_bands[0]
-                    bias_strength = max_bias *(1- progress)  # Stronger ITM focus
+                    bias_strength = max_bias * 1.5 * (1 - progress)  # Stronger ITM focus
                 elif i == 1:  # ATM expert - AUTOMATED CALENDAR FIX
                     condition = (m >= strike_bands[0]) & (m <= strike_bands[1])
                     
@@ -452,10 +463,14 @@ class PiecewiseSurfaceDecoderModular(keras.Model):
                     medium_boost = ops.where((tau >= 0.85) & (tau < 2), 2.0, 0.0)
                     long_boost = ops.where(tau >= 2, moderate_bias, 0.0)  # NEW
 
-                    bias_strength = 1.0 + ultra_short_boost + short_boost + medium_boost + long_boost
+                    bias_strength = 1.0 + ultra_short_boost*2 + short_boost + medium_boost + long_boost
                 else:  # OTM expert
                     condition = m > strike_bands[1]
-                    bias_strength = max_bias*2.5*(1- progress)  # Moderate OTM focus
+                    far_otm = m > 1.3
+                    bias_strength = ops.where(far_otm,
+                                         max_bias * 5.0 * (1 - progress),  # boost far wings
+                                         max_bias * 2.5 * (1 - progress))
+
                 
                 strike_bias = ops.where(condition, bias_strength, 0.0)
                 expert_bias = ops.zeros((batch_size, self.num_experts))

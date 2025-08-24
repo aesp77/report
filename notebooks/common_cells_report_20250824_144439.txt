@@ -1,0 +1,1036 @@
+COMMON CELLS REPORT
+================================================================================
+Generated: 2025-08-24 14:44:39
+Notebooks analyzed: temporal_ae.ipynb, temporal_gbo.ipynb, temporal.ipynb, temporal_vae2.ipynb
+================================================================================
+
+Found 24 cells appearing in multiple notebooks
+--------------------------------------------------------------------------------
+
+COMMON CELL #1
+Hash: 589a329ba2039f92ed56fb6b8c8e3f8c
+Appears in 4 notebooks:
+  - temporal_ae.ipynb, Cell 0
+  - temporal_gbo.ipynb, Cell 0
+  - temporal.ipynb, Cell 0
+  - temporal_vae2.ipynb, Cell 0
+
+Content Preview:
+----------------------------------------
+# Set Keras 3 backend to PyTorch and enable CUDA
+import os
+os.environ["KERAS_BACKEND"] = "torch"
+
+import keras
+keras.config.set_backend("torch")
+
+import torch
+device = torch.device("cuda" if torch.cud...
+
+Full Content:
+----------------------------------------
+# Set Keras 3 backend to PyTorch and enable CUDA
+import os
+os.environ["KERAS_BACKEND"] = "torch"
+
+import keras
+keras.config.set_backend("torch")
+
+import torch
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("Keras backend:", keras.backend.backend())
+print("PyTorch CUDA available:", torch.cuda.is_available())
+print("Selected device:", device)
+================================================================================
+
+COMMON CELL #2
+Hash: 41a2dda5b87d78caf0132aae5a62eac8
+Appears in 4 notebooks:
+  - temporal_ae.ipynb, Cell 1
+  - temporal_gbo.ipynb, Cell 1
+  - temporal.ipynb, Cell 1
+  - temporal_vae2.ipynb, Cell 1
+
+Content Preview:
+----------------------------------------
+import os, random, numpy as np
+
+np.random.seed(13)
+random.seed(13)
+import sys, os
+sys.path.append(os.path.abspath("../src"))
+
+Full Content:
+----------------------------------------
+import os, random, numpy as np
+
+np.random.seed(13)
+random.seed(13)
+import sys, os
+sys.path.append(os.path.abspath("../src"))
+================================================================================
+
+COMMON CELL #3
+Hash: 0252654b4d54069e64ca7cd7f31ce841
+Appears in 4 notebooks:
+  - temporal_ae.ipynb, Cell 2
+  - temporal_gbo.ipynb, Cell 2
+  - temporal.ipynb, Cell 2
+  - temporal_vae2.ipynb, Cell 2
+
+Content Preview:
+----------------------------------------
+
+from data.loader import load_and_clean_raw_dataset
+
+df = load_and_clean_raw_dataset("../data/vol_tensor_dataset.csv")
+
+print(df.columns.tolist())
+print(df.shape)
+# === Global Variables ===
+global LOO...
+
+Full Content:
+----------------------------------------
+
+from data.loader import load_and_clean_raw_dataset
+
+df = load_and_clean_raw_dataset("../data/vol_tensor_dataset.csv")
+
+print(df.columns.tolist())
+print(df.shape)
+# === Global Variables ===
+global LOOKBACK, BATCH_SIZE, LATENT_DIM, SURFACE_SHAPE, FEATURE_DIM
+global TARGET_DATE, TARGET_STRIKE, TARGET_TAU
+
+LOOKBACK = 20
+BATCH_SIZE = 32
+LATENT_DIM = 12
+SURFACE_SHAPE = (11, 10)
+FEATURE_DIM = LOOKBACK * (11 * 10 + 1 + 32)  
+
+TARGET_DATE = "2025-05-21"
+TARGET_STRIKE = 1.0
+TARGET_TAU = 1.0
+
+USE_PREPROCESSED_INPUTS = False
+
+from utils.plotting import plot_raw_iv_slice
+
+plot_raw_iv_slice(df, target_date=TARGET_DATE, target_strike=TARGET_STRIKE, target_tau=TARGET_TAU,)
+
+
+================================================================================
+
+COMMON CELL #4
+Hash: d5853da7382a41d42a6d367d008fa199
+Appears in 4 notebooks:
+  - temporal_ae.ipynb, Cell 3
+  - temporal_gbo.ipynb, Cell 3
+  - temporal.ipynb, Cell 3
+  - temporal_vae2.ipynb, Cell 3
+
+Content Preview:
+----------------------------------------
+from data.dataset_builder import build_full_surface_feature_df
+
+df_all = build_full_surface_feature_df("../data/vol_tensor_dataset.csv")
+
+
+
+print(" Final DataFrame shape:", df_all.shape)
+print(" First...
+
+Full Content:
+----------------------------------------
+from data.dataset_builder import build_full_surface_feature_df
+
+df_all = build_full_surface_feature_df("../data/vol_tensor_dataset.csv")
+
+
+
+print(" Final DataFrame shape:", df_all.shape)
+print(" First 5 dates:", df_all.index[:5].tolist())
+
+iv_cols = [c for c in df_all.columns if c.startswith("IV_")]
+feat_cols = [c for c in df_all.columns if not c.startswith("IV_")]
+df_all = df_all.dropna(subset=feat_cols)
+
+print(" Surface cols:", len(iv_cols), "|  Feature cols:", len(feat_cols))
+print("Surface columns (sample):", iv_cols[:5])
+print("Feature columns (sample):", feat_cols[:5])
+
+nan_summary = df_all[feat_cols].isna().sum()
+nan_summary = nan_summary[nan_summary > 0].sort_values(ascending=False)
+print("Features with NaNs:\n", nan_summary)
+
+
+
+================================================================================
+
+COMMON CELL #5
+Hash: f05152239c08ef5eb88d21c1b62f5768
+Appears in 4 notebooks:
+  - temporal_ae.ipynb, Cell 4
+  - temporal_gbo.ipynb, Cell 4
+  - temporal.ipynb, Cell 4
+  - temporal_vae2.ipynb, Cell 4
+
+Content Preview:
+----------------------------------------
+import matplotlib.pyplot as plt
+import re
+import numpy as np
+import pandas as pd
+
+# --- Select random date
+ix = np.random.randint(len(df_all))
+date = df_all.index[ix]
+
+# --- Parse shape from IV column...
+
+Full Content:
+----------------------------------------
+import matplotlib.pyplot as plt
+import re
+import numpy as np
+import pandas as pd
+
+# --- Select random date
+ix = np.random.randint(len(df_all))
+date = df_all.index[ix]
+
+# --- Parse shape from IV column names
+maturities = sorted(set(re.search(r"IV_(.*?)_", c).group(1) for c in iv_cols))
+strikes = sorted(set(float(re.search(r"_(\d\.\d+)", c).group(1)) for c in iv_cols))
+
+# --- Extract and reshape surface
+surface_values = df_all.iloc[ix][iv_cols].values.reshape(len(maturities), len(strikes))
+
+# --- Plot
+plt.imshow(surface_values, cmap="viridis", aspect="auto")
+plt.title(f"IV Surface on {date}")
+plt.xlabel("Strikes")
+plt.ylabel("Maturities")
+plt.colorbar(label="Implied Volatility")
+plt.show()
+
+# --- Display surface table
+surface_df = pd.DataFrame(surface_values, index=maturities, columns=strikes)
+surface_df.index.name = "Maturity"
+surface_df.columns.name = "Strike"
+
+print(f"\nIV Surface Table on {date}")
+display(surface_df.round(4))
+
+================================================================================
+
+COMMON CELL #6
+Hash: 5b146e6efc992c989d07bafc5f8919b6
+Appears in 4 notebooks:
+  - temporal_ae.ipynb, Cell 5
+  - temporal_gbo.ipynb, Cell 5
+  - temporal.ipynb, Cell 5
+  - temporal_vae2.ipynb, Cell 5
+
+Content Preview:
+----------------------------------------
+from data.tensor_builder import prepare_surface_and_feature_tensors
+from keras import ops
+
+# === Below build_vol_tensors and interpolation functions ===
+tensors, X_feat_tensor, df_feat = prepare_surfa...
+
+Full Content:
+----------------------------------------
+from data.tensor_builder import prepare_surface_and_feature_tensors
+from keras import ops
+
+# === Below build_vol_tensors and interpolation functions ===
+tensors, X_feat_tensor, df_feat = prepare_surface_and_feature_tensors(
+    df_all=df_all,
+    df_raw=df,
+    feat_cols=feat_cols,
+    monthly_interpolation=False  # or True
+)
+
+
+
+# Output summary
+print("Structured tensors loaded and interpolated")
+print("surface_tensor shape:", ops.shape(tensors["surface_tensor"]))
+print("X_feat_tensor shape:", ops.shape(X_feat_tensor))
+print("Number of taus:", len(tensors["taus"]))
+print("Feature columns:", df_feat.columns.tolist())
+
+
+================================================================================
+
+COMMON CELL #7
+Hash: 2b5053cafa6f4fe10b6d235bca3d2bda
+Appears in 3 notebooks:
+  - temporal_ae.ipynb, Cell 6
+  - temporal_gbo.ipynb, Cell 6
+  - temporal_vae2.ipynb, Cell 6
+
+Content Preview:
+----------------------------------------
+import importlib
+import data.dataset
+importlib.reload(data.dataset)
+
+from data.tensor_builder import split_time_series_indices, slice_tensors
+from data.dataset import FeatureToLatentSequenceDataset
+fr...
+
+Full Content:
+----------------------------------------
+import importlib
+import data.dataset
+importlib.reload(data.dataset)
+
+from data.tensor_builder import split_time_series_indices, slice_tensors
+from data.dataset import FeatureToLatentSequenceDataset
+from keras import ops
+import pandas as pd
+
+# --- Split time indices
+T = tensors["surface_tensor"].shape[0]
+train_idx, val_idx, test_idx = split_time_series_indices(T)
+
+train = slice_tensors(tensors, train_idx)
+val   = slice_tensors(tensors, val_idx)
+test  = slice_tensors(tensors, test_idx)
+
+LOOKBACK = 20
+BATCH_SIZE = 32
+
+# --- Datasets with global index tracking
+train_dataset = FeatureToLatentSequenceDataset(
+    surface_tensor=train["surface_tensor"],
+    feature_tensor=X_feat_tensor[train_idx],
+    lookback=LOOKBACK,
+    batch_size=BATCH_SIZE,
+    global_indices=train_idx
+)
+
+val_dataset = FeatureToLatentSequenceDataset(
+    surface_tensor=val["surface_tensor"],
+    feature_tensor=X_feat_tensor[val_idx],
+    lookback=LOOKBACK,
+    batch_size=BATCH_SIZE,
+    global_indices=val_idx
+)
+
+test_dataset = FeatureToLatentSequenceDataset(
+    surface_tensor=test["surface_tensor"],
+    feature_tensor=X_feat_tensor[test_idx],
+    lookback=LOOKBACK,
+    batch_size=BATCH_SIZE,
+    global_indices=test_idx
+)
+
+# --- Inspect one batch to confirm structure
+sample = next(iter(train_dataset))
+
+print("=== Batch from train_dataset ===")
+print("Type:", type(sample))
+print("Len:", len(sample))
+
+x, y = sample
+print("\nInput tuple (x):", type(x), "Length:", len(x))
+print("  x[0] (surf_seq) shape:", x[0].shape)
+print("  x[1] (feat_seq) shape:", x[1].shape)
+
+print("\nTarget (y):", type(y), "Shape:", y.shape)
+
+# --- Global diagnostics
+M, K = tensors["surface_tensor"].shape[1:3]
+flat_len = M * K
+
+print(f"\n[INFO] Dataset Shapes and Diagnostics:")
+print(f"  - train_dataset batches   : {len(train_dataset)}")
+print(f"  - val_dataset batches     : {len(val_dataset)}")
+print(f"  - test_dataset batches    : {len(test_dataset)}")
+print(f"  - IV Surface dim (M, K)   : ({M}, {K})")
+
+# --- Check target date location
+target_date = pd.Timestamp("2025-05-21")
+idx = np.where(tensors["date_tensor"] == target_date)[0][0]
+print("\n[DATE CHECK]")
+print("Target global index:", idx)
+print("In test?", idx in test_dataset.global_indices)
+print("Train:", train_idx[[0, -1]])
+print("Val:", val_idx[[0, -1]])
+print("Test:", test_idx[[0, -1]])
+
+================================================================================
+
+COMMON CELL #8
+Hash: 0c8d3889a9eca64066cc28172515daf4
+Appears in 3 notebooks:
+  - temporal_ae.ipynb, Cell 9
+  - temporal_gbo.ipynb, Cell 9
+  - temporal_vae2.ipynb, Cell 9
+
+Content Preview:
+----------------------------------------
+import importlib
+import models.lstm
+importlib.reload(models.lstm)
+from models.lstm import build_lstm_forecaster_augmented
+
+lr = 5e-4
+input_dim = X_feat_tensor.shape[-1] + LATENT_DIM  # features + enco...
+
+Full Content:
+----------------------------------------
+import importlib
+import models.lstm
+importlib.reload(models.lstm)
+from models.lstm import build_lstm_forecaster_augmented
+
+lr = 5e-4
+input_dim = X_feat_tensor.shape[-1] + LATENT_DIM  # features + encoded surface
+
+lstm_model = build_lstm_forecaster_augmented(
+    lookback=LOOKBACK,
+    input_dim=LATENT_DIM,      
+    latent_dim=LATENT_DIM,
+    lr=lr
+)
+
+
+lstm_model.summary()
+
+================================================================================
+
+COMMON CELL #9
+Hash: 241f56949e798046966b5bdfdc9d86c7
+Appears in 4 notebooks:
+  - temporal_ae.ipynb, Cell 11
+  - temporal_gbo.ipynb, Cell 11
+  - temporal.ipynb, Cell 11
+  - temporal_vae2.ipynb, Cell 11
+
+Content Preview:
+----------------------------------------
+import matplotlib.pyplot as plt
+
+plt.plot(history_lstm.history["loss"], label="Train Loss")
+plt.plot(history_lstm.history["val_loss"], label="Val Loss")
+plt.title("LSTM Forecasting Loss")
+plt.xlabel("...
+
+Full Content:
+----------------------------------------
+import matplotlib.pyplot as plt
+
+plt.plot(history_lstm.history["loss"], label="Train Loss")
+plt.plot(history_lstm.history["val_loss"], label="Val Loss")
+plt.title("LSTM Forecasting Loss")
+plt.xlabel("Epoch")
+plt.ylabel("MSE")
+plt.legend()
+plt.grid()
+plt.show()
+
+================================================================================
+
+COMMON CELL #10
+Hash: cf6f5f9a02be4704929b57ac203e1a04
+Appears in 3 notebooks:
+  - temporal_ae.ipynb, Cell 13
+  - temporal_gbo.ipynb, Cell 13
+  - temporal_vae2.ipynb, Cell 13
+
+Content Preview:
+----------------------------------------
+import importlib
+import models.lstm
+importlib.reload(models.lstm)
+
+from models.lstm import build_lstm_with_attention_augmented
+
+lr = 5e-4
+input_dim = LATENT_DIM  # since z_seq already encodes [surface...
+
+Full Content:
+----------------------------------------
+import importlib
+import models.lstm
+importlib.reload(models.lstm)
+
+from models.lstm import build_lstm_with_attention_augmented
+
+lr = 5e-4
+input_dim = LATENT_DIM  # since z_seq already encodes [surface ⨁ features]
+
+lstm_model = build_lstm_with_attention_augmented(
+    lookback=LOOKBACK,
+    input_dim=input_dim,
+    latent_dim=LATENT_DIM,
+    lr=lr
+)
+
+lstm_model.summary()
+
+================================================================================
+
+COMMON CELL #11
+Hash: 14fac2105330ae675d30d0ac2154d150
+Appears in 3 notebooks:
+  - temporal_ae.ipynb, Cell 15
+  - temporal_gbo.ipynb, Cell 15
+  - temporal_vae2.ipynb, Cell 15
+
+Content Preview:
+----------------------------------------
+import matplotlib.pyplot as plt
+
+plt.plot(history_lstm_attn.history["loss"], label="Train Loss")
+plt.plot(history_lstm_attn.history["val_loss"], label="Val Loss")
+plt.title("LSTM-Attn Forecasting Loss...
+
+Full Content:
+----------------------------------------
+import matplotlib.pyplot as plt
+
+plt.plot(history_lstm_attn.history["loss"], label="Train Loss")
+plt.plot(history_lstm_attn.history["val_loss"], label="Val Loss")
+plt.title("LSTM-Attn Forecasting Loss")
+plt.xlabel("Epoch")
+plt.ylabel("MSE")
+plt.legend()
+plt.grid()
+plt.show()
+
+================================================================================
+
+COMMON CELL #12
+Hash: 4ffb7f9f8a0d1e5bdc49162d1ef01fcf
+Appears in 4 notebooks:
+  - temporal_ae.ipynb, Cell 17
+  - temporal_gbo.ipynb, Cell 17
+  - temporal.ipynb, Cell 17
+  - temporal_vae2.ipynb, Cell 17
+
+Content Preview:
+----------------------------------------
+import pandas as pd
+
+def collect_model_summaries(*summaries):
+    return pd.concat(summaries, ignore_index=True).sort_values("latent_mse_total")
+
+
+
+summary_all = collect_model_summaries(
+    summary_l...
+
+Full Content:
+----------------------------------------
+import pandas as pd
+
+def collect_model_summaries(*summaries):
+    return pd.concat(summaries, ignore_index=True).sort_values("latent_mse_total")
+
+
+
+summary_all = collect_model_summaries(
+    summary_lstm,
+    summary_lstm_attn,
+    # add summary_gru, summary_transformer, etc.
+)
+
+display(summary_all)
+
+
+================================================================================
+
+COMMON CELL #13
+Hash: 6567fdde73f53bea5d72678de04f0409
+Appears in 3 notebooks:
+  - temporal_ae.ipynb, Cell 18
+  - temporal_gbo.ipynb, Cell 18
+  - temporal_vae2.ipynb, Cell 18
+
+Content Preview:
+----------------------------------------
+import models.transformer
+importlib.reload(models.transformer)
+
+from models.transformer import build_attention_forecaster
+
+attention_model = build_attention_forecaster(
+    lookback=LOOKBACK,
+    inpu...
+
+Full Content:
+----------------------------------------
+import models.transformer
+importlib.reload(models.transformer)
+
+from models.transformer import build_attention_forecaster
+
+attention_model = build_attention_forecaster(
+    lookback=LOOKBACK,
+    input_dim=LATENT_DIM,
+    latent_dim=LATENT_DIM,
+    lr=5e-4,
+    dropout=0.0,
+    use_layernorm=False  # 
+)
+
+
+
+attention_model.summary()
+
+================================================================================
+
+COMMON CELL #14
+Hash: c94a17eb5a6f34e74b3fec90d4f9120a
+Appears in 4 notebooks:
+  - temporal_ae.ipynb, Cell 20
+  - temporal_gbo.ipynb, Cell 20
+  - temporal.ipynb, Cell 20
+  - temporal_vae2.ipynb, Cell 20
+
+Content Preview:
+----------------------------------------
+import matplotlib.pyplot as plt
+
+plt.plot(history_attention.history["loss"], label="Train Loss")
+plt.plot(history_attention.history["val_loss"], label="Val Loss")
+plt.title("LSTM Forecasting Loss")
+pl...
+
+Full Content:
+----------------------------------------
+import matplotlib.pyplot as plt
+
+plt.plot(history_attention.history["loss"], label="Train Loss")
+plt.plot(history_attention.history["val_loss"], label="Val Loss")
+plt.title("LSTM Forecasting Loss")
+plt.xlabel("Epoch")
+plt.ylabel("MSE")
+plt.legend()
+plt.grid()
+plt.show()
+
+================================================================================
+
+COMMON CELL #15
+Hash: d7ff92c9966b1d72503a0a3b9411e6cc
+Appears in 4 notebooks:
+  - temporal_ae.ipynb, Cell 22
+  - temporal_gbo.ipynb, Cell 22
+  - temporal.ipynb, Cell 22
+  - temporal_vae2.ipynb, Cell 22
+
+Content Preview:
+----------------------------------------
+import utils.eval
+importlib.reload(utils.eval)
+
+
+
+def collect_model_summaries(*summaries):
+    return pd.concat(summaries, ignore_index=True).sort_values("latent_mse_total")
+
+
+
+summary_all = collect_m...
+
+Full Content:
+----------------------------------------
+import utils.eval
+importlib.reload(utils.eval)
+
+
+
+def collect_model_summaries(*summaries):
+    return pd.concat(summaries, ignore_index=True).sort_values("latent_mse_total")
+
+
+
+summary_all = collect_model_summaries(
+    summary_lstm,
+    summary_lstm_attn,
+    summary_attention,
+    # add summary_gru, summary_transformer, etc.
+)
+
+from utils.eval import rank_temporal_model_summaries
+
+ranked_summary = rank_temporal_model_summaries(summary_all)
+display(ranked_summary)
+
+
+
+================================================================================
+
+COMMON CELL #16
+Hash: 5aa85a1d5955db4aae3be0fc0036699c
+Appears in 3 notebooks:
+  - temporal_ae.ipynb, Cell 24
+  - temporal_gbo.ipynb, Cell 24
+  - temporal_vae2.ipynb, Cell 24
+
+Content Preview:
+----------------------------------------
+import models.transformer
+import importlib
+importlib.reload(models.transformer)
+
+from models.transformer import TransformerForecaster
+
+input_dim = LATENT_DIM  # z_seq only
+lr = 5e-4
+
+transformer_model...
+
+Full Content:
+----------------------------------------
+import models.transformer
+import importlib
+importlib.reload(models.transformer)
+
+from models.transformer import TransformerForecaster
+
+input_dim = LATENT_DIM  # z_seq only
+lr = 5e-4
+
+transformer_model = TransformerForecaster(
+    lookback=LOOKBACK,
+    input_dim=input_dim,
+    latent_dim=LATENT_DIM,
+    d_model=128,
+    n_heads=4,
+    ff_dim=128,
+    n_layers=6,
+    dropout=0.0  # match LSTM setup
+)
+
+# Build model once with dummy input
+_ = transformer_model(np.zeros((1, LOOKBACK, input_dim), dtype="float32"))
+transformer_model.compile(optimizer=keras.optimizers.Adam(lr), loss="mse")
+transformer_model.summary()
+
+================================================================================
+
+COMMON CELL #17
+Hash: eaddcb274be15e70e34fa93afc4d0e42
+Appears in 3 notebooks:
+  - temporal_ae.ipynb, Cell 26
+  - temporal_gbo.ipynb, Cell 26
+  - temporal_vae2.ipynb, Cell 26
+
+Content Preview:
+----------------------------------------
+import matplotlib.pyplot as plt
+
+plt.plot(history_transformer.history["loss"], label="Train Loss")
+plt.plot(history_transformer.history["val_loss"], label="Val Loss")
+plt.title("Transfomer Forecasting...
+
+Full Content:
+----------------------------------------
+import matplotlib.pyplot as plt
+
+plt.plot(history_transformer.history["loss"], label="Train Loss")
+plt.plot(history_transformer.history["val_loss"], label="Val Loss")
+plt.title("Transfomer Forecasting Loss")
+plt.xlabel("Epoch")
+plt.ylabel("MSE")
+plt.legend()
+plt.grid()
+plt.show()
+
+================================================================================
+
+COMMON CELL #18
+Hash: bb47728993eb2aafe5fa011aa90e4fed
+Appears in 4 notebooks:
+  - temporal_ae.ipynb, Cell 28
+  - temporal_gbo.ipynb, Cell 28
+  - temporal.ipynb, Cell 28
+  - temporal_vae2.ipynb, Cell 28
+
+Content Preview:
+----------------------------------------
+import utils.eval
+importlib.reload(utils.eval)
+
+
+
+def collect_model_summaries(*summaries):
+    return pd.concat(summaries, ignore_index=True).sort_values("latent_mse_total")
+
+
+
+summary_all = collect_m...
+
+Full Content:
+----------------------------------------
+import utils.eval
+importlib.reload(utils.eval)
+
+
+
+def collect_model_summaries(*summaries):
+    return pd.concat(summaries, ignore_index=True).sort_values("latent_mse_total")
+
+
+
+summary_all = collect_model_summaries(
+    summary_lstm,
+    summary_lstm_attn,
+    summary_attention,
+    summary_transformer,
+    # add summary_gru, summary_transformer, etc.
+)
+
+from utils.eval import rank_temporal_model_summaries
+
+ranked_summary = rank_temporal_model_summaries(summary_all)
+display(ranked_summary)
+
+
+
+================================================================================
+
+COMMON CELL #19
+Hash: 97803bd964e55071c162dfbbbe71fcfe
+Appears in 3 notebooks:
+  - temporal_ae.ipynb, Cell 29
+  - temporal_gbo.ipynb, Cell 29
+  - temporal_vae2.ipynb, Cell 29
+
+Content Preview:
+----------------------------------------
+import models.transformer
+import importlib
+importlib.reload(models.transformer)
+
+from models.transformer import TransformerForecasterV2
+
+input_dim = LATENT_DIM  # z_seq only (already includes surface ...
+
+Full Content:
+----------------------------------------
+import models.transformer
+import importlib
+importlib.reload(models.transformer)
+
+from models.transformer import TransformerForecasterV2
+
+input_dim = LATENT_DIM  # z_seq only (already includes surface + features)
+lr = 5e-4
+
+transformer_model_v2 = TransformerForecasterV2(
+    lookback=LOOKBACK,
+    input_dim=input_dim,
+    latent_dim=LATENT_DIM,
+    d_model=128,
+    n_heads=4,
+    ff_dim=256,
+    n_layers=6,
+    dropout=0.0  # match LSTM config
+)
+
+# Force build for summary
+dummy_input = np.zeros((1, LOOKBACK, input_dim), dtype="float32")
+transformer_model_v2(dummy_input)
+
+transformer_model_v2.compile(optimizer=keras.optimizers.Adam(lr), loss="mse")
+transformer_model_v2.summary()
+
+================================================================================
+
+COMMON CELL #20
+Hash: 7d80d06045130daeab7ebc5b8ec90e37
+Appears in 3 notebooks:
+  - temporal_ae.ipynb, Cell 31
+  - temporal_gbo.ipynb, Cell 31
+  - temporal_vae2.ipynb, Cell 31
+
+Content Preview:
+----------------------------------------
+import matplotlib.pyplot as plt
+
+plt.plot(history_transformer_v2.history["loss"], label="Train Loss")
+plt.plot(history_transformer_v2.history["val_loss"], label="Val Loss")
+plt.title("Transformer_v2 F...
+
+Full Content:
+----------------------------------------
+import matplotlib.pyplot as plt
+
+plt.plot(history_transformer_v2.history["loss"], label="Train Loss")
+plt.plot(history_transformer_v2.history["val_loss"], label="Val Loss")
+plt.title("Transformer_v2 Forecasting Loss")
+plt.xlabel("Epoch")
+plt.ylabel("MSE")
+plt.legend()
+plt.grid()
+plt.show()
+
+================================================================================
+
+COMMON CELL #21
+Hash: c8deb0cd416914db3812a41e63ba3626
+Appears in 4 notebooks:
+  - temporal_ae.ipynb, Cell 33
+  - temporal_gbo.ipynb, Cell 33
+  - temporal.ipynb, Cell 33
+  - temporal_vae2.ipynb, Cell 33
+
+Content Preview:
+----------------------------------------
+import utils.eval
+importlib.reload(utils.eval)
+
+
+
+def collect_model_summaries(*summaries):
+    return pd.concat(summaries, ignore_index=True).sort_values("latent_mse_total")
+
+
+
+summary_all = collect_m...
+
+Full Content:
+----------------------------------------
+import utils.eval
+importlib.reload(utils.eval)
+
+
+
+def collect_model_summaries(*summaries):
+    return pd.concat(summaries, ignore_index=True).sort_values("latent_mse_total")
+
+
+
+summary_all = collect_model_summaries(
+    summary_lstm,
+    summary_lstm_attn,
+    summary_attention,
+    summary_transformer,
+    summary_transformer_v2
+    # add summary_gru, summary_transformer, etc.
+)
+
+from utils.eval import rank_temporal_model_summaries
+
+ranked_summary = rank_temporal_model_summaries(summary_all)
+display(ranked_summary)
+
+
+
+================================================================================
+
+COMMON CELL #22
+Hash: 8a1c4575a8427c5576add53b5937881c
+Appears in 4 notebooks:
+  - temporal_ae.ipynb, Cell 36
+  - temporal_gbo.ipynb, Cell 36
+  - temporal.ipynb, Cell 36
+  - temporal_vae2.ipynb, Cell 36
+
+Content Preview:
+----------------------------------------
+import matplotlib.pyplot as plt
+
+plt.plot(history_gru.history["loss"], label="Train Loss")
+plt.plot(history_gru.history["val_loss"], label="Val Loss")
+plt.title("GRU Forecasting Loss")
+plt.xlabel("Epo...
+
+Full Content:
+----------------------------------------
+import matplotlib.pyplot as plt
+
+plt.plot(history_gru.history["loss"], label="Train Loss")
+plt.plot(history_gru.history["val_loss"], label="Val Loss")
+plt.title("GRU Forecasting Loss")
+plt.xlabel("Epoch")
+plt.ylabel("MSE")
+plt.legend()
+plt.grid()
+plt.show()
+
+================================================================================
+
+COMMON CELL #23
+Hash: b4bd2c8ea018604ca8cdae79290c8092
+Appears in 4 notebooks:
+  - temporal_ae.ipynb, Cell 38
+  - temporal_gbo.ipynb, Cell 38
+  - temporal.ipynb, Cell 38
+  - temporal_vae2.ipynb, Cell 38
+
+Content Preview:
+----------------------------------------
+import utils.eval
+importlib.reload(utils.eval)
+
+
+
+def collect_model_summaries(*summaries):
+    return pd.concat(summaries, ignore_index=True).sort_values("latent_mse_total")
+
+
+
+summary_all = collect_m...
+
+Full Content:
+----------------------------------------
+import utils.eval
+importlib.reload(utils.eval)
+
+
+
+def collect_model_summaries(*summaries):
+    return pd.concat(summaries, ignore_index=True).sort_values("latent_mse_total")
+
+
+
+summary_all = collect_model_summaries(
+    summary_lstm,
+    summary_lstm_attn,
+    summary_attention,
+    summary_transformer,
+    summary_transformer_v2,
+    summary_gru,
+    # add summary_gru, summary_transformer, etc.
+)
+
+from utils.eval import rank_temporal_model_summaries
+
+ranked_summary = rank_temporal_model_summaries(summary_all)
+display(ranked_summary)
+
+
+
+================================================================================
+
+COMMON CELL #24
+Hash: d41d8cd98f00b204e9800998ecf8427e
+Appears in 2 notebooks:
+  - temporal_gbo.ipynb, Cell 40
+  - temporal.ipynb, Cell 9
+
+Content Preview:
+----------------------------------------
+
+
+Full Content:
+----------------------------------------
+
+================================================================================
+
+
+SUMMARY
+--------------------------------------------------------------------------------
+Total unique cells: 95
+Cells appearing in multiple notebooks: 24

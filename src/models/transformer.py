@@ -127,7 +127,7 @@ class TransformerForecasterV2(Model):
         self.ff_dim = ff_dim
         self.n_layers = n_layers
         self.dropout = dropout
-        self.center_input = False
+        self.center_input = True
         self.lookback = lookback
         self.input_proj = Dense(d_model)
         self.pos_embedding = Embedding(input_dim=lookback, output_dim=d_model)
