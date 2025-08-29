@@ -20,9 +20,9 @@ Volatility surfaces reflect the underlying return distribution and interactions 
 
 Two notebooks allow the examiner to reproduce the main results without retraining:
 
-- *pipelines_load_models.ipynb*: loads pre-trained models, assembles full pipelines, and benchmarks performance against PCA-VAR baselines. Approximate runtime: 20 minutes with GPU.
+- `pipelines_load_models.ipynb`: loads pre-trained models, assembles full pipelines, and benchmarks performance against PCA-VAR baselines. Approximate runtime: 20 minutes with GPU.
 
-- *final_pipeline.ipynb*: runs a complete end-to-end pipeline (VAE encoder, GRU temporal model, VAE decoder, MoE corrective decoder). Approximate runtime: 4 hours with GPU.
+- `final_pipeline.ipynb`: runs a complete end-to-end pipeline (VAE encoder, GRU temporal model, VAE decoder, MoE corrective decoder). Approximate runtime: 4 hours with GPU.
 
 These notebooks are sufficient to demonstrate the system end-to-end and reproduce the comparative analysis.
 
@@ -71,7 +71,6 @@ report/
 │   │   ├── encoder_pca.py
 │   │   ├── forecaster_var.py
 │   │   ├── fw_pca.py
-│   │   ├── gbo.py
 │   │   ├── gru.py
 │   │   ├── lstm.py
 │   │   ├── pointwise_moe.py
