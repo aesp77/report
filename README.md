@@ -1,114 +1,154 @@
-# Research Project
+# Volatility Surface Modeling & Forecasting Project
+This repository contains the full codebase, data, and experiments for modeling, forecasting, and analyzing financial options volatility surfaces.
+The project implements a modular deep learning pipeline that combines machine learning, time series forecasting, and financial engineering.
 
-This repository contains experiments and scripts for analyzing and modeling options volatility surfaces. The main goal is to build datasets of historical implied volatility, train generative models (VAE and LSTM), and calibrate stochastic volatility models such as Heston.
+## Project Overview
+The objective is to encode historical implied volatility surfaces and market features into latent representations, model their temporal dynamics, and decode them to forecast future volatility surfaces.
+Volatility surfaces reflect the underlying return distribution and interactions with broader market factors. This project develops a prototype forecasting framework that learns these interactions from both volatility surfaces and engineered market features 
+
+## Project Highlights
+- **End-to-end modular pipeline**: encoders - temporal models - decoders - evaluation.  
+- **26+ full pipeline configurations** benchmarked systematically.  
+- **Comparative framework**: models ranked jointly on statistical accuracy (RMSE), arbitrage consistency, and temporal stability.  
+
+## Key Contributions
+- A **Black–Scholes hybrid loss** weighting errors by option sensitivities (Vega, Gamma).  
+- A **Mixture-of-Experts (MoE) decoder** with explicit maturity/moneyness specialisation, annealed biases, and diversity regularisation.  
+- Demonstration of the common **“good RMSE, bad fit” pathology** and how structured models resolve it.  
+
+## Reproducible Experiments
+
+Two notebooks allow the examiner to reproduce the main results without retraining:
+
+- *pipelines_load_models.ipynb*: loads pre-trained models, assembles full pipelines, and benchmarks performance against PCA-VAR baselines. Approximate runtime: 20 minutes with GPU.
+
+- *final_pipeline.ipynb*: runs a complete end-to-end pipeline (VAE encoder, GRU temporal model, VAE decoder, MoE corrective decoder). Approximate runtime: 4 hours with GPU.
+
+These notebooks are sufficient to demonstrate the system end-to-end and reproduce the comparative analysis.
+
+*Note*: All models are implemented in Keras 3 API with PyTorch backend and are GPU-enabled.
+
+
 
 ## Directory Structure
 
 ```
-Project/
-├── data/                     # Contains pre-generated datasets and intermediate results
+report/
+├── data/                  # Datasets and intermediate results
 │   ├── SPX_Index_history_dataset.csv
 │   ├── vol_tensor_dataset.csv
-│   └── ...
-├── notebooks/                # Jupyter notebooks for experiments and analysis
-│   ├── dataset_creator.ipynb
-│   ├── Project_VAE_LTSM_clean.ipynb
-│   ├── project_calibration.ipynb
-│   ├── ...
-├── src/                      # Source code for models and utilities
-│   ├── data/                 # Data processing scripts
-│   │   ├── loader.py         # upload dataset
-│   │   ├── parametrization.py# runs heston and ssvi
-│   │   ├── tensor_builder.py
-│   │   ├── ssvi.py           # SSVI surface fitting
-│   │   └── heston.py         # Heston model calibration
-│   ├── models/               # Model definitions
-│   │   ├── vae.py
-│   │   ├── lstm.py
+├── notebooks/             # Jupyter notebooks for experiments and analysis
+│   ├── baseline.ipynb
+│   ├── decoders_experiments_ae_gru.ipynb
+│   ├── decoders_experiments_vae_gru.ipynb
+│   ├── decoders_pointwise_ae.ipynb
+│   ├── decoders_pointwise_fwpca.ipynb
+│   ├── decoders_pointwise_vae.ipynb
+│   ├── edav.ipynb
+│   ├── encoders.ipynb
+│   ├── final_pipeline.ipynb   # display 1 pipeline , run
+│   ├── pipelines_load_models.ipynb #dispaly summary results for experiments 
+│   ├── raw_dataset_generator.ipynb
+│   ├── temporal.ipynb
+│   ├── temporal_ae.ipynb
+│   ├── temporal_fwpca.ipynb
+│   ├── temporal_vae2.ipynb
+│   ├── saved_images/      # Plots and figures
+│   └── saved_models/      # Trained model files
+├── src/                   # Source code for data, models, and utilities
+│   ├── data/              # Data processing and feature engineering
+│   │   ├── dataset.py
+│   │   ├── dataset_builder.py
+│   │   ├── edav.py
+│   │   ├── feature_engineering.py
+│   │   ├── loader.py
+│   │   └── tensor_builder.py
+│   ├── models/            # Model definitions and decoders
+│   │   ├── ae.py
+│   │   ├── cnn.py
 │   │   ├── decoder.py
-│   │   └── no_arb_sl.py
-│   ├── utils/                # Utility scripts
-│   │   ├── plotting.py
+│   │   ├── decoder_losses.py
+│   │   ├── encoder_pca.py
+│   │   ├── forecaster_var.py
+│   │   ├── fw_pca.py
+│   │   ├── gbo.py
+│   │   ├── gru.py
+│   │   ├── lstm.py
+│   │   ├── pointwise_moe.py
+│   │   ├── pointwise_moe_adpt.py
+│   │   ├── rl_decoder.py
+│   │   ├── ssvi.py
+│   │   ├── transformer.py
+│   │   ├── vae_l1.py
+│   │   ├── vae_l2.py
+│   │   ├── vae_mle.py
+│   │   ├── vae_mle_b.py
+│   │   ├── vae_mle_fv.py
+│   │   └── ...
+│   ├── utils/             # Utility scripts for plotting, evaluation, routing
 │   │   ├── eval.py
-│   │   └── simulation.py
-│   └── ...
-├── README.md                 # Project documentation
-├── requirements.txt          # Python dependencies
-└── ...
+│   │   ├── moe_weights.py
+│   │   ├── plot_error.py
+│   │   ├── plotting.py
+│   │   └── pointwise_router.py
+├── requirements.txt       # Python dependencies
+├── README.md              # Project documentation
+└── LICENSE                # License information
 ```
 
-## Dataset Requirements
+## Data Requirements
 
-The notebooks expect pre-generated CSV files in the `data/` directory:
+- Place the following CSV files in the `data/` directory:
+  - `SPX_Index_history_dataset.csv`: Historical index and market data
+  - `vol_tensor_dataset.csv`: Precomputed volatility surface tensors
+- These can be generated using `notebooks/raw_dataset_generator.ipynb` or other data scripts.
 
-* `SPX_Index_history_dataset.csv`
-* `vol_tensor_dataset.csv`
+## Notebooks
 
-These files can be produced using the notebook `notebooks/dataset_creator.ipynb`, which pulls market data from internal data sources. The scripts assume that these CSVs are available before running any training or calibration notebooks.
+- All main experiments, model training, and analysis are performed in the `notebooks/` folder.
+- Notebooks are organized by pipeline stage (encoding, temporal modeling, decoding, evaluation).
+- Visualizations and saved model weights are stored in `notebooks/saved_images/` and `notebooks/saved_models/`.
 
-## Setup
+## Source Code Modules
 
-1. Use **Python 3.10.11** (or newer).
-2. Install dependencies:
+- `src/data/`: Data loading, feature engineering, and tensor construction
+- `src/models/`: Model architectures (PCA, AE, VAE, LSTM, GRU, Transformer, MoE, CNN, decoders)
+- `src/utils/`: Plotting, evaluation, region routing, and helper functions
 
-```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
+## Pipeline Summary
 
-## Latent Surface Modeling Pipeline
+1. **Encoding**: Compress volatility surfaces and features into latent vectors using PCA, AE, or VAE.
+2. **Temporal Modeling**: Forecast latent vectors using LSTM, GRU, Transformer, or VAR models.
+3. **Decoding**: Reconstruct future volatility surfaces from predicted latent vectors using various decoders (MLP, CNN, RL-based, MoE).
+4. **Evaluation**: Assess model performance, visualize results, and analyze error regions.
 
-### 1. Problem Overview
+## Setup Instructions
 
-At each timestep $t$, we observe:
+1. Create a Python virtual environment (Python 3.10+ recommended):
+   ```bash
+   python -m venv .venv
+   .\.venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
+2. Place required data files in the `data/` directory.
+3. Run experiments and analysis using the Jupyter notebooks in `notebooks/`.
 
-* Volatility surface $y_t \in \mathbb{R}^{M \times K}$, where $M$ = maturities and $K$ = strikes.
-* Market features $x_t \in \mathbb{R}^D$, such as yield curves, returns, volatilities, macro signals.
+## Model Families & Features
 
-We define engineered features:
+- **PCAEncoder, AE, VAE**: Latent encoding of surfaces and features
+- **LSTM, GRU, Transformer**: Temporal forecasting of latent states
+- **Decoders**: Corrective MLP, CNN, RL-based, MoE, pointwise and slice-level correction
+- **Evaluation**: Error analysis, region-based routing, and visualization
 
-$f_t = \text{FeatureEngineer}(x_t, y_t) \in \mathbb{R}^{d_f}$
+## Outputs
 
-These are combined into:
+- Forecasted volatility surfaces, error heatmaps, model weights, and plots
+- All outputs are saved in `notebooks/saved_images/` and `notebooks/saved_models/`
 
-$\tilde{x}_t = \text{flatten}(y_t) \Vert f_t \in \mathbb{R}^{M \cdot K + d_f}$
+## License
 
-The goal is to encode $\tilde{x}_t$ into a latent vector $z_t$, model its dynamics, and decode it into forecasted IV surfaces.
+This project is licensed under the terms of the LICENSE file in the repository.
 
-### 2. Pipeline Architecture
+---
 
-#### Phase A — Latent Encoding
-
-* PCA (baseline): linear compression.
-* Autoencoder (AE): $\tilde{x}_t \rightarrow z_t$
-* Variational AE (VAE): $\tilde{x}_t \rightarrow (\mu_t, \log \sigma_t^2), z_t \sim \mathcal{N}(\mu_t, \sigma_t^2)$
-
-Trained to reconstruct $\tilde{x}_t$ with optional penalties (smoothness, no-arbitrage).
-
-#### Phase B — Latent Temporal Forecasting
-
-Given historical encoded latent vectors and features:
-
-$[z_{t-L}, \dots, z_t] \oplus f_t \rightarrow \hat{z}_{t+1}$
-
-Models:
-
-* LSTM, GRU, Transformer (deep learning)
-* PCA-VAR (linear autoregression baseline)
-* Feature conditioning optional
-
-#### Phase C — Decoding IV Surface
-
-Given $\hat{z}_{t+1}$, reconstruct:
-
-$\hat{y}_{t+1} = \text{Decoder}(\hat{z}_{t+1}) \quad \text{or} \quad \text{Decoder}(\hat{z}_{t+1}, f_{t+1})$
-
-Decoder families:
-
-* **SimpleSurfaceDecoder**: MLP-based with calendar/smile penalties
-* **CNNDecoder**: latent-to-grid decoding via Conv2D
-* **SurfaceRLDecoder**: residual correction over entire surfaces
-* **SliceRLDecoder**: residual smile-level correction per $\tau$, using $[IV, \tau]$ as input
-
-This framework enables forecasting and refining forward-looking volatility surfaces from market state embeddings.
+For questions or contributions, please contact the project maintainer or open an issue in the repository.
