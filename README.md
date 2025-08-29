@@ -151,4 +151,4 @@ This project is licensed under the terms of the LICENSE file in the repository.
 
 ---
 
-For questions or contributions, please contact the project maintainer or open an issue in the repository.
+
